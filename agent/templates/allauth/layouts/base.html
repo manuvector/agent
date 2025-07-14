@@ -19,28 +19,7 @@
         <header data-bs-theme="dark">
             <nav class="navbar navbar-expand-lg bg-body-tertiary">
                 <div class="container-fluid">
-                    <a class="navbar-brand" href="/">django-allauth</a>
-                    <button class="navbar-toggler"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#navbarText"
-                            aria-controls="navbarText"
-                            aria-expanded="false"
-                            aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="navbarText">
-                        <ul role="navigation"
-                            aria-label="Project links"
-                            class="navbar-nav me-auto mb-2 mb-lg-0">
-                            <li class="nav-item">
-                                <a class="nav-link active" href="https://docs.allauth.org/">Documentation</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="https://codeberg.org/allauth/django-allauth">Repository</a>
-                            </li>
-                        </ul>
-                        <div class="d-flex flex-column flex-sm-row gap-2 col-lg-3 justify-content-lg-end text-nowrap">
+                        <div class="d-flex flex-row gap-2 justify-content-end ms-auto text-nowrap">
                             <form class="d-flex" method="post" action="{% url 'set_language' %}">
                                 {% csrf_token %}
                                 {% get_available_languages as LANGUAGES %}
