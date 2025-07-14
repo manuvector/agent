@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./db:/srv/db
+    env_file:
+      - .env
     environment:
       DATABASE_NAME: /srv/db/agent.db
     ports:

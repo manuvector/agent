@@ -5,24 +5,48 @@ function App() {
     { from: 'bot', text: 'Hello! How can I help you?' }
   ]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e) => {
     setInput(e.target.value);
   };
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (input.trim() === '') return;
-    setMessages([...messages, { from: 'user', text: input }]);
+    const userMessage = { from: 'user', text: input };
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
-    // Here you would send the message to the backend and get a response
-    // For now, just echo a dummy bot response
-    setTimeout(() => {
-      setMessages((prev) => [
+    setLoading(true);
+
+    try {
+      // Replace '/api/chat' with your actual backend endpoint
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message: input })
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      const botMessage = {
+        from: 'bot',
+        text: data.response || "Sorry, I didn't understand that."
+      };
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      setMessages(prev => [
         ...prev,
-        { from: 'bot', text: "I'm just a demo bot. You said: " + input }
+        { from: 'bot', text: "Sorry, there was an error contacting the server." }
       ]);
-    }, 500);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,6 +87,21 @@ function App() {
             </span>
           </div>
         ))}
+        {loading && (
+          <div style={{ textAlign: 'left', margin: '6px 0' }}>
+            <span style={{
+              display: 'inline-block',
+              background: '#e2e2e2',
+              color: '#222',
+              padding: '6px 12px',
+              borderRadius: 16,
+              maxWidth: '80%',
+              wordBreak: 'break-word'
+            }}>
+              ...
+            </span>
+          </div>
+        )}
       </div>
       <form onSubmit={handleSend} style={{ display: 'flex', gap: 8 }}>
         <input
@@ -77,6 +116,7 @@ function App() {
             border: '1px solid #ccc',
             outline: 'none'
           }}
+          disabled={loading}
         />
         <button
           type="submit"
@@ -88,6 +128,7 @@ function App() {
             color: '#fff',
             cursor: 'pointer'
           }}
+          disabled={loading}
         >
           Send
         </button>
