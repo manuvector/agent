@@ -12,6 +12,7 @@ COPY requirements.txt manage.py Makefile ./
 RUN pip install -r requirements.txt
 
 COPY ./agent ./agent/
+COPY ./rag ./rag/
 
 # Install Node.js and npm
 RUN apt-get update && \

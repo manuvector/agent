@@ -1,18 +1,28 @@
 version: "3"
 services:
-  web:
-    build:
-      context: ./
-      dockerfile: Dockerfile
+  db:
+    image: ankane/pgvector:latest          # PostgreSQL with pgvector
+    env_file: .env
+
     volumes:
-      - ./db:/srv/db
-    env_file:
-      - .env
-    environment:
-      DATABASE_NAME: /srv/db/agent.db
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro 
+
     ports:
-      - 8000:8000
-    command:
-      - make
-      - migrate
-      - runserver
+      - "5432:5432"
+  web:
+    build: .
+    depends_on:
+      - db
+    env_file: .env                         # keep OPENAI_API_KEY here
+    environment:
+      POSTGRES_DB: ragdb
+      DATABASE_URL: postgres://raguser:ragpass@db:5432/ragdb
+    
+    ports:
+      - "8000:8000"
+    command: ["make", "migrate", "runserver"]
+
+volumes:
+  pgdata:
+

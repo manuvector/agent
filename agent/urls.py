@@ -6,6 +6,8 @@ from allauth.account.decorators import secure_admin_login
 
 from agent.views import chat_completion
 
+from rag.views import ingest_document
+
 admin.autodiscover()
 admin.site.login = secure_admin_login(admin.site.login)
 
@@ -18,3 +20,8 @@ urlpatterns = [
     path("", include("allauth.idp.urls")),
     path("api/chat", chat_completion, name="chat_completion"),
 ]
+
+urlpatterns += [
+    path("api/ingest", ingest_document, name="ingest_document"),
+]
+

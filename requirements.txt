@@ -1,4 +1,8 @@
 django-allauth[mfa,saml,socialaccount,steam]>=65.10.0
 whitenoise
+psycopg[binary]
+pgvector[django]         
 openai
 dotenv
+dj-database-url
+
