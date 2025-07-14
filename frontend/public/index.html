@@ -1,14 +1,28 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <title>Chatbot</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
-</html>
+{# agent/templates/index.html #}
+{% extends "allauth/layouts/base.html" %}
+{% load static i18n %}
+
+{% block head_title %}Chatbot{% endblock %}
+
+{# optional <head> additions – favicon, theme-color, … #}
+{% block extra_head %}
+    {{ block.super }}
+    <link rel="icon" href="{% static 'frontend/favicon.ico' %}">
+    <meta name="theme-color" content="#000000">
+{% endblock %}
+
+{% block body %}
+    <!-- flex-box centre horizontally, but let the chat choose its own width -->
+    <main class="flex-grow-1 d-flex flex-column align-items-center py-4">
+        <div id="root" style="width:100%;max-width:460px;"></div>
+    </main>
+
+    <noscript>{% trans "You need to enable JavaScript to run this app." %}</noscript>
+
+    {# CRA bundles copied into agent/static/frontend/ during the Docker build #}
+    <link  href="{% static 'frontend/static/css/main.css' %}" rel="stylesheet">
+    <script src="{% static 'frontend/static/js/runtime.js' %}"></script>
+    <script src="{% static 'frontend/static/js/vendors.js' %}"></script>
+    <script src="{% static 'frontend/static/js/main.js' %}"></script>
+{% endblock %}
+
