@@ -5,8 +5,6 @@ services:
       context: ./
       dockerfile: Dockerfile
     volumes:
-      - ./agent:/code/agent/
-      - ../../allauth:/code/allauth
       - ./db:/srv/db
     environment:
       DATABASE_NAME: /srv/db/agent.db
