@@ -137,7 +137,6 @@ export default function App() {
 /* – – – inline styles – – – */
 const styles = {
   wrapper: {
-    maxWidth: 460,
     margin: "40px auto",
     border: "1px solid #ccc",
     borderRadius: 8,
@@ -146,7 +145,6 @@ const styles = {
   },
   chatBox: {
     minHeight: 200,
-    maxHeight: 300,
     overflowY: "auto",
     marginBottom: 12,
     background: "#f9f9f9",
@@ -158,7 +156,6 @@ const styles = {
     display: "inline-block",
     padding: "6px 12px",
     borderRadius: 16,
-    maxWidth: "80%",
     wordBreak: "break-word",
   },
   chatForm: { display: "flex", gap: 8 },

@@ -2,7 +2,10 @@ version: "3"
 services:
   db:
     image: ankane/pgvector:latest          # PostgreSQL with pgvector
-    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -10,10 +13,19 @@ services:
 
     ports:
       - "5432:5432"
+    
+    healthcheck:            # <- wait for the socket to be ready
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
   web:
     build: .
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file: .env                         # keep OPENAI_API_KEY here
     environment:
       POSTGRES_DB: ragdb
