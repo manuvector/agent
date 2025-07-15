@@ -10,6 +10,8 @@ docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXT
 echo "✅ pgvector extension created (or already exists)"
 
 
+docker compose exec web python manage.py makemigrations 
+docker compose exec web python manage.py migrate
 docker compose exec web python manage.py makemigrations rag
 docker compose exec web python manage.py migrate rag
 

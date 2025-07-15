@@ -8,9 +8,7 @@ import React, { useState } from "react";
  */
 export default function App() {
   /* Chat state */
-  const [messages, setMessages] = useState([
-    { from: "bot", text: "Hello! How can I help you?" },
-  ]);
+  const [messages, setMessages] = useState([]);                                                                                                                    
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
