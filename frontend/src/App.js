@@ -92,7 +92,7 @@ export default function App() {
   /* – – – UI – – – */
   return (
     <div style={styles.wrapper}>
-      <h2>Chatbot with RAG upload</h2>
+      <h2>Chat with your docs</h2>
 
       {/* Chat window */}
       <div style={styles.chatBox}>
