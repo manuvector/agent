@@ -12,17 +12,17 @@
 {% endblock %}
 
 {% block body %}
-    <!-- flex-box centre horizontally, but let the chat choose its own width -->
-    <main class="flex-grow-1 d-flex flex-column align-items-center py-4">
-        <div id="root" style="width:100%;max-width:460px;"></div>
-    </main>
+  <!-- full-viewport flex column (body already flexes) -->
+  <main class="flex-grow-1 d-flex flex-column w-100 h-100">
+    <!-- React root stretches too -->
+    <div id="root" class="flex-grow-1 w-100 h-100"></div>
+  </main>
 
-    <noscript>{% trans "You need to enable JavaScript to run this app." %}</noscript>
+  <noscript>{% trans "You need to enable JavaScript to run this app." %}</noscript>
 
-    {# CRA bundles copied into agent/static/frontend/ during the Docker build #}
-    <link  href="{% static 'frontend/static/css/main.css' %}" rel="stylesheet">
-    <script src="{% static 'frontend/static/js/runtime.js' %}"></script>
-    <script src="{% static 'frontend/static/js/vendors.js' %}"></script>
-    <script src="{% static 'frontend/static/js/main.js' %}"></script>
+  {# CRA bundles copied during Docker build #}
+  <link  href="{% static 'frontend/static/css/main.css' %}" rel="stylesheet">
+  <script src="{% static 'frontend/static/js/runtime.js' %}"></script>
+  <script src="{% static 'frontend/static/js/vendors.js' %}"></script>
+  <script src="{% static 'frontend/static/js/main.js' %}"></script>
 {% endblock %}
-

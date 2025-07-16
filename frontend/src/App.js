@@ -143,14 +143,17 @@ export default function App() {
 /* – – – inline styles – – – */
 const styles = {
   wrapper: {
-    margin: "40px auto",
-    border: "1px solid #ccc",
-    borderRadius: 8,
-    padding: 16,
+    width: "100%",
+    height: "100%",          // grab all the space given by main
+    display: "flex",
+    flexDirection: "column",
+    padding: 16,             // keep some breathing room
+    boxSizing: "border-box",
     fontFamily: "Arial, sans-serif",
   },
   chatBox: {
-    minHeight: 200,
+    flex: 1,                 // grow / shrink with window
+    minHeight: 0,            // allow shrinking (important!)
     overflowY: "auto",
     marginBottom: 12,
     background: "#f9f9f9",
@@ -158,6 +161,7 @@ const styles = {
     borderRadius: 4,
     border: "1px solid #eee",
   },
+
   bubble: {
     display: "inline-block",
     padding: "6px 12px",
