@@ -1,28 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 
-/**
- * Very small all-in-one UI:  
- * – Chat panel (existing functionality)  
- * – "Upload document" panel → sends text to /api/ingest so the backend can embed & store it.  
- * The component stays self-contained with **no extra libraries** (just Fetch + FileReader).
- */
 export default function App() {
   /* Chat state */
-  const [messages, setMessages] = useState([]);                                                                                                                    
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
   /* Upload state */
   const [file, setFile] = useState(null);
-  const [uploadMsg, setUploadMsg] = useState(null); // success / error string
+  const [uploadMsg, setUploadMsg] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const fileInputRef = useRef(null);   // ← to reset <input>
 
   /* – – – Chat helpers – – – */
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    // optimistic render
     setMessages((prev) => [...prev, { from: "user", text: input }]);
     setInput("");
     setChatLoading(true);
@@ -33,13 +27,13 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: input }),
       });
-      if (!res.ok) throw new Error("network");
+      if (!res.ok) throw new Error();
       const data = await res.json();
       setMessages((prev) => [
         ...prev,
         { from: "bot", text: data.response || "(no response)" },
       ]);
-    } catch (err) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         { from: "bot", text: "Sorry, there was an error contacting the server." },
@@ -55,36 +49,31 @@ export default function App() {
     setUploadMsg(null);
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const text = reader.result;
-      if (!text || typeof text !== "string") {
-        setUploadMsg("Could not read file contents.");
-        return;
-      }
+    setUploadLoading(true);
+    setUploadMsg(null);
 
-      setUploadLoading(true);
-      try {
-        const res = await fetch("/api/ingest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: text }),
-        });
-        if (!res.ok) throw new Error("ingest failed");
-        await res.json();
-        setUploadMsg("✓ Document uploaded & ingested");
-        setFile(null);
-        // optional: you might want to clear the input element here
-      } catch (err) {
-        setUploadMsg("Error uploading document");
-      } finally {
-        setUploadLoading(false);
-      }
-    };
-    reader.readAsText(file);
+    try {
+      const formData = new FormData();
+      formData.append("pdf_file", file);          // backend expects this key
+
+      const res = await fetch("/api/ingest", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error();
+
+      await res.json();
+      setUploadMsg("✓ Document uploaded & ingested");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = ""; // clear <input>
+    } catch {
+      setUploadMsg("Error uploading document");
+    } finally {
+      setUploadLoading(false);
+    }
   };
 
   /* – – – UI – – – */
@@ -96,12 +85,19 @@ export default function App() {
       <div style={styles.chatBox}>
         {messages.map((m, i) => (
           <div key={i} style={{ textAlign: m.from === "user" ? "right" : "left" }}>
-            <span style={{ ...styles.bubble, background: m.from === "user" ? "#daf1fc" : "#e2e2e2" }}>{m.text}</span>
+            <span
+              style={{
+                ...styles.bubble,
+                background: m.from === "user" ? "#daf1fc" : "#e2e2e2",
+              }}
+            >
+              {m.text}
+            </span>
           </div>
         ))}
         {chatLoading && (
           <div style={{ textAlign: "left" }}>
-            <span style={{ ...styles.bubble }}>...</span>
+            <span style={styles.bubble}>...</span>
           </div>
         )}
       </div>
@@ -116,15 +112,27 @@ export default function App() {
           style={styles.input}
           disabled={chatLoading}
         />
-        <button type="submit" style={styles.btn} disabled={chatLoading}>Send</button>
+        <button type="submit" style={styles.btn} disabled={chatLoading}>
+          Send
+        </button>
       </form>
 
       <hr style={{ margin: "24px 0" }} />
 
       {/* Upload section */}
       <h3>Add knowledge</h3>
-      <input type="file" accept=".txt,.md,.json" onChange={handleFileChange} disabled={uploadLoading} />
-      <button style={{ ...styles.btn, marginLeft: 8 }} onClick={handleUpload} disabled={uploadLoading || !file}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.md,.json,.pdf"
+        onChange={handleFileChange}
+        disabled={uploadLoading}
+      />
+      <button
+        style={{ ...styles.btn, marginLeft: 8 }}
+        onClick={handleUpload}
+        disabled={uploadLoading || !file}
+      >
         {uploadLoading ? "Uploading…" : "Upload"}
       </button>
       {uploadMsg && <p>{uploadMsg}</p>}

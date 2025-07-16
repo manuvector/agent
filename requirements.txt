@@ -5,4 +5,5 @@ pgvector[django]
 openai
 dotenv
 dj-database-url
-
+tiktoken==0.7.0      
+PyPDF2
