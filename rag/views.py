@@ -3,6 +3,8 @@ import json
 import logging
 import os
 from io import BytesIO
+from django.db.models import Count
+from django.views.decorators.http import require_GET, require_POST
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -72,11 +74,78 @@ def ingest_document(request):
             )
             resp = client.embeddings.create(model=EMBEDDING_MODEL, input=chunk)
             emb  = resp.data[0].embedding
-            Document.objects.create(content=chunk, embedding=emb)
+            Document.objects.create(content=chunk,
+                                    file_name=upload.name,
+                                    embedding=emb)
 
         return JsonResponse({"status": "stored"})
 
     except Exception as exc:
         logger.exception("Ingestion failed")
         return JsonResponse({"error": str(exc)}, status=400)
+
+
+# top of file
+from django.db import connection               # NEW
+from pgvector.psycopg import register_vector   # NEW
+# (keep client, EMBEDDING_MODEL, etc.)
+
+@require_GET
+def list_files(request):
+    """
+    GET /api/files[?q=text]
+
+    • No q  → alphabetical list
+    • q=str → list ordered by semantic distance (LOWER = more similar)
+    """
+    q = request.GET.get("q", "").strip()
+    if not q:
+        files = (
+            Document.objects
+            .values("file_name")
+            .annotate(chunks=Count("id"))
+            .order_by("file_name")
+        )
+        return JsonResponse(list(files), safe=False)
+
+    # ── embed the query ─────────────────────────────────────────────
+    emb = client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=q
+    ).data[0].embedding
+
+    # ── distance-ranked files ───────────────────────────────────────
+    with connection.cursor() as cur:
+        register_vector(cur.connection)        # enable <-> operator
+        cur.execute(
+            """
+            SELECT file_name,
+                   COUNT(*)                        AS chunks,
+                   MIN(embedding <-> %s::vector)   AS distance   -- ← cast here
+            FROM rag_document
+            GROUP BY file_name
+            ORDER BY distance
+            LIMIT 50
+            """,
+            [emb],
+        )
+
+
+        rows = cur.fetchall()
+
+    files = [
+        {"file_name": fn, "chunks": c, "distance": float(d)}
+        for fn, c, d in rows
+    ]
+    return JsonResponse(files, safe=False)
+
+
+@csrf_exempt
+@require_POST
+def search_similar(request):
+    data   = json.loads(request.body or "{}")
+    query  = data.get("query", "").strip()
+    limit  = int(data.get("k", 5))
+    hits   = get_relevant_context(query, k=limit)  # already written helper
+    return JsonResponse({"results": hits})
 

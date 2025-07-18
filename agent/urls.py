@@ -6,7 +6,7 @@ from allauth.account.decorators import secure_admin_login
 
 from agent.views import chat_completion
 
-from rag.views import ingest_document
+from rag.views import ingest_document, list_files, search_similar
 
 admin.autodiscover()
 admin.site.login = secure_admin_login(admin.site.login)
@@ -19,9 +19,8 @@ urlpatterns = [
     path("i18n/", include("django.conf.urls.i18n")),
     path("", include("allauth.idp.urls")),
     path("api/chat", chat_completion, name="chat_completion"),
-]
-
-urlpatterns += [
     path("api/ingest", ingest_document, name="ingest_document"),
+    path("api/files",   list_files,    name="list_files"),
+    path("api/search",  search_similar, name="search_similar"),
 ]
 
