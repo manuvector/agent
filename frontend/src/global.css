@@ -1,0 +1,9 @@
+/* Make the whole document exactly the viewport height,
+   but still allow the page to scroll if its *content* is taller. */
+html,
+body,
+#root {
+  height: 100vh;   /* viewport height */
+  margin: 0;       /* remove default body margin */
+}
+
