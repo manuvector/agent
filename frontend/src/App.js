@@ -105,27 +105,49 @@ export default function App() {
   /* ───── UI ───── */
   return (
     <div style={styles.layout}>
-      {/* ───── Sidebar ───── */}
-      <aside style={styles.sidebar}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Semantic search…"
-          style={styles.searchInput}
-        />
+{/* ───── Sidebar ───── */}
+<aside style={styles.sidebar}>
+  {/* search bar */}
+  <input
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    placeholder="Semantic search…"
+    style={styles.searchInput}
+  />
 
-        <h4 style={{ marginTop: 16 }}>Uploaded files</h4>
-        <ul style={styles.list}>
-          {files.map((f) => (
-            <li key={f.file_name}>
-              {f.file_name} <small>({f.chunks})</small>
-              {f.distance !== undefined && (
-                <small style={{ color: "#888" }}> – {f.distance.toFixed(2)}</small>
-              )}
-            </li>
-          ))}
-        </ul>
-      </aside>
+  {/* file list */}
+  <h4 style={{ marginTop: 16 }}>Uploaded files</h4>
+  <ul style={styles.list}>
+    {files.map((f) => (
+      <li key={f.file_name}>
+        {f.file_name} <small>({f.chunks})</small>
+        {f.distance !== undefined && (
+          <small style={{ color: "#888" }}> – {f.distance.toFixed(2)}</small>
+        )}
+      </li>
+    ))}
+  </ul>
+
+  {/* 🔄 NEW: upload controls now live in the sidebar */}
+  <h4 style={{ marginTop: 24 }}>Add knowledge</h4>
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept=".txt,.md,.json,.pdf"
+    onChange={handleFileChange}
+    disabled={uploadLoading}
+    style={{ width: "100%", marginBottom: 8 }}
+  />
+  <button
+    style={{ ...styles.btn, width: "100%" }}
+    onClick={handleUpload}
+    disabled={uploadLoading || !file}
+  >
+    {uploadLoading ? "Uploading…" : "Upload"}
+  </button>
+  {uploadMsg && <p style={{ fontSize: 12 }}>{uploadMsg}</p>}
+</aside>
+
 
       {/* ───── Main column ───── */}
       <div style={styles.wrapper}>
@@ -172,23 +194,6 @@ export default function App() {
 
         <hr style={{ margin: "24px 0" }} />
 
-        {/* Upload section */}
-        <h3>Add knowledge</h3>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".txt,.md,.json,.pdf"
-          onChange={handleFileChange}
-          disabled={uploadLoading}
-        />
-        <button
-          style={{ ...styles.btn, marginLeft: 8 }}
-          onClick={handleUpload}
-          disabled={uploadLoading || !file}
-        >
-          {uploadLoading ? "Uploading…" : "Upload"}
-        </button>
-        {uploadMsg && <p>{uploadMsg}</p>}
       </div>
     </div>
   );
@@ -244,14 +249,15 @@ const styles = {
     outline: "none",
   },
 
-  btn: {
-    padding: "8px 16px",
-    borderRadius: 16,
-    border: "none",
-    background: "#007bff",
-    color: "#fff",
-    cursor: "pointer",
-  },
+btn: {
+  padding: "8px 16px",
+  borderRadius: 16,
+  border: "none",
+  background: "#007bff",
+  color: "#fff",
+  cursor: "pointer",
+  width: "auto",      // keep default
+},
 
   searchInput: {
     width: "100%",
