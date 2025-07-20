@@ -1,20 +1,22 @@
 // frontend/src/App.js
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function App() {
   /* ───── State ───── */
-  const [messages, setMessages]   = useState([]);
-  const [input, setInput]         = useState("");
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
-  const [file, setFile]           = useState(null);
+  const [file, setFile] = useState(null);
   const [uploadMsg, setUploadMsg] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
-  const fileInputRef              = useRef(null);
+  const fileInputRef = useRef(null);
 
-  const [files, setFiles]         = useState([]);
-  const [search, setSearch]       = useState("");
-  const fetchTimer                = useRef(null);   // debounce timer
+  const [files, setFiles] = useState([]);
+  const [search, setSearch] = useState("");
+  const fetchTimer = useRef(null); // debounce timer
 
   /* ───── Chat helpers ───── */
   const handleSend = async (e) => {
@@ -97,7 +99,7 @@ export default function App() {
 
       const res = await fetch(url);
       if (res.ok) setFiles(await res.json());
-    }, 300);                                   // 300 ms debounce
+    }, 300); // 300 ms debounce
 
     return () => clearTimeout(fetchTimer.current);
   }, [search]);
@@ -105,49 +107,48 @@ export default function App() {
   /* ───── UI ───── */
   return (
     <div style={styles.layout}>
-{/* ───── Sidebar ───── */}
-<aside style={styles.sidebar}>
-  {/* search bar */}
-  <input
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    placeholder="Semantic search…"
-    style={styles.searchInput}
-  />
+      {/* ───── Sidebar ───── */}
+      <aside style={styles.sidebar}>
+        {/* search bar */}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Semantic search…"
+          style={styles.searchInput}
+        />
 
-  {/* file list */}
-  <h4 style={{ marginTop: 16 }}>Uploaded files</h4>
-  <ul style={styles.list}>
-    {files.map((f) => (
-      <li key={f.file_name}>
-        {f.file_name} <small>({f.chunks})</small>
-        {f.distance !== undefined && (
-          <small style={{ color: "#888" }}> – {f.distance.toFixed(2)}</small>
-        )}
-      </li>
-    ))}
-  </ul>
+        {/* file list */}
+        <h4 style={{ marginTop: 16 }}>Uploaded files</h4>
+        <ul style={styles.list}>
+          {files.map((f) => (
+            <li key={f.file_name}>
+              {f.file_name} <small>({f.chunks})</small>
+              {f.distance !== undefined && (
+                <small style={{ color: "#888" }}> – {f.distance.toFixed(2)}</small>
+              )}
+            </li>
+          ))}
+        </ul>
 
-  {/* 🔄 NEW: upload controls now live in the sidebar */}
-  <h4 style={{ marginTop: 24 }}>Add knowledge</h4>
-  <input
-    ref={fileInputRef}
-    type="file"
-    accept=".txt,.md,.json,.pdf"
-    onChange={handleFileChange}
-    disabled={uploadLoading}
-    style={{ width: "100%", marginBottom: 8 }}
-  />
-  <button
-    style={{ ...styles.btn, width: "100%" }}
-    onClick={handleUpload}
-    disabled={uploadLoading || !file}
-  >
-    {uploadLoading ? "Uploading…" : "Upload"}
-  </button>
-  {uploadMsg && <p style={{ fontSize: 12 }}>{uploadMsg}</p>}
-</aside>
-
+        {/* 🔄 NEW: upload controls now live in the sidebar */}
+        <h4 style={{ marginTop: 24 }}>Add knowledge</h4>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.md,.json,.pdf"
+          onChange={handleFileChange}
+          disabled={uploadLoading}
+          style={{ width: "100%", marginBottom: 8 }}
+        />
+        <button
+          style={{ ...styles.btn, width: "100%" }}
+          onClick={handleUpload}
+          disabled={uploadLoading || !file}
+        >
+          {uploadLoading ? "Uploading…" : "Upload"}
+        </button>
+        {uploadMsg && <p style={{ fontSize: 12 }}>{uploadMsg}</p>}
+      </aside>
 
       {/* ───── Main column ───── */}
       <div style={styles.wrapper}>
@@ -160,14 +161,26 @@ export default function App() {
               key={i}
               style={{ textAlign: m.from === "user" ? "right" : "left" }}
             >
-              <span
-                style={{
-                  ...styles.bubble,
-                  background: m.from === "user" ? "#daf1fc" : "#e2e2e2",
-                }}
-              >
-                {m.text}
-              </span>
+              {m.from === "bot" ? (
+                <div
+                  style={{
+                    ...styles.bubble,
+                    background: "#e2e2e2",
+                    maxWidth: "80%",
+                  }}
+                >
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <span
+                  style={{
+                    ...styles.bubble,
+                    background: "#daf1fc",
+                  }}
+                >
+                  {m.text}
+                </span>
+              )}
             </div>
           ))}
           {chatLoading && (
@@ -193,7 +206,6 @@ export default function App() {
         </form>
 
         <hr style={{ margin: "24px 0" }} />
-
       </div>
     </div>
   );
@@ -249,15 +261,15 @@ const styles = {
     outline: "none",
   },
 
-btn: {
-  padding: "8px 16px",
-  borderRadius: 16,
-  border: "none",
-  background: "#007bff",
-  color: "#fff",
-  cursor: "pointer",
-  width: "auto",      // keep default
-},
+  btn: {
+    padding: "8px 16px",
+    borderRadius: 16,
+    border: "none",
+    background: "#007bff",
+    color: "#fff",
+    cursor: "pointer",
+    width: "auto", // keep default
+  },
 
   searchInput: {
     width: "100%",
