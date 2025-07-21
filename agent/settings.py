@@ -169,7 +169,27 @@ MIDDLEWARE = (
     "allauth.account.middleware.AccountMiddleware",
 )
 
-AUTHENTICATION_BACKENDS = ("allauth.account.auth_backends.AuthenticationBackend",)
+
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # for Django admin
+    'allauth.account.auth_backends.AuthenticationBackend',  # for allauth
+]
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+            'key': ''
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    }
+}
+
 
 ROOT_URLCONF = "agent.urls"
 
@@ -240,6 +260,9 @@ ACCOUNT_LOGIN_METHODS = {
 ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = True
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_ADAPTER = "agent.users.allauth.AccountAdapter"
+LOGIN_REDIRECT_URL = "/"         # After successful login
+ACCOUNT_SIGNUP_REDIRECT_URL = "/"  # After successful signup
+ACCOUNT_LOGOUT_REDIRECT_URL = "/"  # Optional: where to go after logout
 
 
 MFA_SUPPORTED_TYPES = [
