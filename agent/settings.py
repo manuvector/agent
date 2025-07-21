@@ -260,9 +260,9 @@ ACCOUNT_LOGIN_METHODS = {
 ACCOUNT_PASSWORD_RESET_BY_CODE_ENABLED = True
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_ADAPTER = "agent.users.allauth.AccountAdapter"
-LOGIN_REDIRECT_URL = "/"         # After successful login
-ACCOUNT_SIGNUP_REDIRECT_URL = "/"  # After successful signup
-ACCOUNT_LOGOUT_REDIRECT_URL = "/"  # Optional: where to go after logout
+LOGIN_REDIRECT_URL = "/chat"         # After successful login
+ACCOUNT_SIGNUP_REDIRECT_URL = "/chat"  # After successful signup
+ACCOUNT_LOGOUT_REDIRECT_URL = "/chat"  # Optional: where to go after logout
 
 
 MFA_SUPPORTED_TYPES = [
