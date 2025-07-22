@@ -1,9 +1,14 @@
 django-allauth[mfa,saml,socialaccount,steam]>=65.10.0
 whitenoise
 psycopg[binary]
-pgvector[django]         
+pgvector[django]
 openai
 dotenv
 dj-database-url
-tiktoken==0.7.0      
+tiktoken==0.7.0
 PyPDF2
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+

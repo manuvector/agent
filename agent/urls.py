@@ -4,7 +4,7 @@ from django.views.generic.base import TemplateView
 
 from allauth.account.decorators import secure_admin_login
 
-from agent.views import chat_completion
+from agent.views import *
 
 from rag.views import ingest_document, list_files, search_similar
 
@@ -22,5 +22,12 @@ urlpatterns = [
     path("api/ingest", ingest_document, name="ingest_document"),
     path("api/files",   list_files,    name="list_files"),
     path("api/search",  search_similar, name="search_similar"),
+    path("connect/drive/", drive_connect, name="drive_connect"),
+    path("connect/drive/callback/", drive_callback, name="drive_callback"),
+
+    # Google Drive Picker integration
+    path("api/drive/token", drive_token, name="drive_token"),
+    path("api/drive/files", store_selected_files, name="store_selected_files"),
+
 ]
 

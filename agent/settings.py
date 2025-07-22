@@ -234,6 +234,7 @@ INSTALLED_APPS = (
     "allauth.socialaccount.providers.xing",
     "allauth.usersessions",
     "agent.users",
+    "agent",
     "pgvector.django",
     "rag"
 )
