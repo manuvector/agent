@@ -3,6 +3,10 @@ FROM python:3.12
 
 ENV PYTHONUNBUFFERED=1
 
+ARG REACT_APP_GOOGLE_DEVELOPER_KEY
+ENV REACT_APP_GOOGLE_DEVELOPER_KEY=$REACT_APP_GOOGLE_DEVELOPER_KEY
+
+
 # -------- system deps --------------------------------------------------------
 RUN apt-get update && \
     apt-get -y install \

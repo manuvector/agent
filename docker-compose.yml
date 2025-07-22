@@ -9,6 +9,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      REACT_APP_GOOGLE_DEVELOPER_KEY: ${REACT_APP_GOOGLE_DEVELOPER_KEY}
+
     healthcheck:
       # CMD-SHELL lets us use $var without YAML quoting headaches
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -31,6 +33,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-raguser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ragpass}
       DATABASE_URL: ${DATABASE_URL}
+      REACT_APP_GOOGLE_DEVELOPER_KEY: ${REACT_APP_GOOGLE_DEVELOPER_KEY}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     ports:
       - "8000:8000"
     # No "command:" override – entrypoint handles migrations + runserver

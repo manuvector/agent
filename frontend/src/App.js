@@ -1,31 +1,96 @@
 // frontend/src/App.js
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+// Expose your GCP API key as REACT_APP_GOOGLE_DEVELOPER_KEY=XXXX
+const DEVELOPER_KEY = process.env.REACT_APP_GOOGLE_DEVELOPER_KEY;
+
 export default function App() {
   /* ───── State ───── */
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
+  const [messages, setMessages]   = useState([]);
+  const [input, setInput]         = useState("");
+  const [chatLoading, setLoading] = useState(false);
 
-  const [file, setFile] = useState(null);
-  const [uploadMsg, setUploadMsg] = useState(null);
-  const [uploadLoading, setUploadLoading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const [files, setFiles] = useState([]);
+  const [files, setFiles]   = useState([]);
   const [search, setSearch] = useState("");
-  const fetchTimer = useRef(null); // debounce timer
+  const fetchTimer          = useRef(null);
+
+  // Google Picker boot state
+  const [pickerReady, setPickerReady] = useState(false);
+
+  /* ───── Google Picker bootstrap ───── */
+  useEffect(() => {
+    // Helper: runs after gapi is on the page
+    const initPicker = () => {
+      window.gapi.load("picker", { callback: () => setPickerReady(true) });
+    };
+
+    if (window.gapi) {
+      // Script already present
+      initPicker();
+    } else {
+      // Inject script, then init
+      const s = document.createElement("script");
+      s.src = "https://apis.google.com/js/api.js";
+      s.onload = initPicker;
+      document.body.appendChild(s);
+    }
+  }, []);
+
+  const openDrivePicker = useCallback(async () => {
+    if (!pickerReady) return;
+
+    // 1️⃣ Get a short‑lived token from your backend
+    const res = await fetch("/api/drive/token");
+    if (res.status === 400) {
+      window.location.href = "/connect/drive/"; // start OAuth
+      return;
+    }
+    if (!res.ok) {
+      alert("Could not obtain Google Drive token");
+      return;
+    }
+    const { token } = await res.json();
+
+    // 2️⃣ Build Picker
+    const view = new window.google.picker.DocsView()
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(true);
+
+    const picker = new window.google.picker.PickerBuilder()
+      .addView(view)
+      .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
+      .setDeveloperKey(DEVELOPER_KEY)
+      .setOAuthToken(token)
+      .setOrigin(window.location.origin)
+      .setCallback(async data => {
+        if (data.action === window.google.picker.Action.PICKED) {
+          const picked = data.docs.map(d => ({ id: d.id, name: d.name }));
+          await fetch("/api/drive/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ files: picked }),
+          });
+          // Optimistic UI update
+          setFiles(prev => [
+            ...prev,
+            ...picked.map(p => ({ file_name: p.name, chunks: "Drive" })),
+          ]);
+        }
+      })
+      .build();
+    picker.setVisible(true);
+  }, [pickerReady]);
 
   /* ───── Chat helpers ───── */
-  const handleSend = async (e) => {
+  const handleSend = async e => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    setMessages((prev) => [...prev, { from: "user", text: input }]);
+    setMessages(prev => [...prev, { from: "user", text: input }]);
     setInput("");
-    setChatLoading(true);
+    setLoading(true);
 
     try {
       const res = await fetch("/api/chat", {
@@ -35,47 +100,17 @@ export default function App() {
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         { from: "bot", text: data.response || "(no response)" },
       ]);
     } catch {
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         { from: "bot", text: "Sorry, there was an error contacting the server." },
       ]);
     } finally {
-      setChatLoading(false);
-    }
-  };
-
-  /* ───── Upload helpers ───── */
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0] || null);
-    setUploadMsg(null);
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
-
-    setUploadLoading(true);
-    setUploadMsg(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("pdf_file", file);
-
-      const res = await fetch("/api/ingest", { method: "POST", body: formData });
-      if (!res.ok) throw new Error();
-
-      await res.json();
-      setUploadMsg("✓ Document uploaded & ingested");
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    } catch {
-      setUploadMsg("Error uploading document");
-    } finally {
-      setUploadLoading(false);
+      setLoading(false);
     }
   };
 
@@ -89,18 +124,14 @@ export default function App() {
 
   /* ───── Files list: live similarity search ───── */
   useEffect(() => {
-    // clear previous timer
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
-
     fetchTimer.current = setTimeout(async () => {
       const url = search.trim()
         ? `/api/files?q=${encodeURIComponent(search)}`
         : "/api/files";
-
       const res = await fetch(url);
       if (res.ok) setFiles(await res.json());
-    }, 300); // 300 ms debounce
-
+    }, 300);
     return () => clearTimeout(fetchTimer.current);
   }, [search]);
 
@@ -109,20 +140,18 @@ export default function App() {
     <div style={styles.layout}>
       {/* ───── Sidebar ───── */}
       <aside style={styles.sidebar}>
-        {/* search bar */}
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
           placeholder="Semantic search…"
           style={styles.searchInput}
         />
 
-        {/* file list */}
-        <h4 style={{ marginTop: 16 }}>Uploaded files</h4>
+        <h4 style={{ marginTop: 16 }}>Knowledge files</h4>
         <ul style={styles.list}>
-          {files.map((f) => (
+          {files.map(f => (
             <li key={f.file_name}>
-              {f.file_name} <small>({f.chunks})</small>
+              {f.file_name} <small>{f.chunks && `(${f.chunks})`}</small>
               {f.distance !== undefined && (
                 <small style={{ color: "#888" }}> – {f.distance.toFixed(2)}</small>
               )}
@@ -130,37 +159,23 @@ export default function App() {
           ))}
         </ul>
 
-        {/* 🔄 NEW: upload controls now live in the sidebar */}
         <h4 style={{ marginTop: 24 }}>Add knowledge</h4>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".txt,.md,.json,.pdf"
-          onChange={handleFileChange}
-          disabled={uploadLoading}
-          style={{ width: "100%", marginBottom: 8 }}
-        />
-        <button
-          style={{ ...styles.btn, width: "100%" }}
-          onClick={handleUpload}
-          disabled={uploadLoading || !file}
-        >
-          {uploadLoading ? "Uploading…" : "Upload"}
-        </button>
-        {uploadMsg && <p style={{ fontSize: 12 }}>{uploadMsg}</p>}
+        {pickerReady ? (
+          <button style={{ ...styles.btn, width: "100%" }} onClick={openDrivePicker}>
+            Connect Google Drive
+          </button>
+        ) : (
+          <span style={{ fontSize: 12 }}>Loading Google Picker…</span>
+        )}
       </aside>
 
       {/* ───── Main column ───── */}
       <div style={styles.wrapper}>
         <h2>Chat with your docs</h2>
 
-        {/* Chat window */}
         <div style={styles.chatBox}>
           {messages.map((m, i) => (
-            <div
-              key={i}
-              style={{ textAlign: m.from === "user" ? "right" : "left" }}
-            >
+            <div key={i} style={{ textAlign: m.from === "user" ? "right" : "left" }}>
               {m.from === "bot" ? (
                 <div
                   style={{
@@ -172,14 +187,7 @@ export default function App() {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                 </div>
               ) : (
-                <span
-                  style={{
-                    ...styles.bubble,
-                    background: "#daf1fc",
-                  }}
-                >
-                  {m.text}
-                </span>
+                <span style={{ ...styles.bubble, background: "#daf1fc" }}>{m.text}</span>
               )}
             </div>
           ))}
@@ -190,12 +198,11 @@ export default function App() {
           )}
         </div>
 
-        {/* Chat input */}
         <form onSubmit={handleSend} style={styles.chatForm}>
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={e => setInput(e.target.value)}
             placeholder="Type your message…"
             style={styles.input}
             disabled={chatLoading}
@@ -204,8 +211,6 @@ export default function App() {
             Send
           </button>
         </form>
-
-        <hr style={{ margin: "24px 0" }} />
       </div>
     </div>
   );
@@ -214,7 +219,6 @@ export default function App() {
 /* ───── Inline styles ───── */
 const styles = {
   layout: { display: "flex", height: "100%" },
-
   sidebar: {
     width: 260,
     padding: 16,
@@ -223,7 +227,6 @@ const styles = {
     background: "#fafafa",
     fontFamily: "Arial, sans-serif",
   },
-
   wrapper: {
     flex: 1,
     display: "flex",
@@ -232,7 +235,6 @@ const styles = {
     boxSizing: "border-box",
     fontFamily: "Arial, sans-serif",
   },
-
   chatBox: {
     flex: 1,
     minHeight: 0,
@@ -243,16 +245,13 @@ const styles = {
     borderRadius: 4,
     border: "1px solid #eee",
   },
-
   bubble: {
     display: "inline-block",
     padding: "6px 12px",
     borderRadius: 16,
     wordBreak: "break-word",
   },
-
   chatForm: { display: "flex", gap: 8 },
-
   input: {
     flex: 1,
     padding: 8,
@@ -260,7 +259,6 @@ const styles = {
     border: "1px solid #ccc",
     outline: "none",
   },
-
   btn: {
     padding: "8px 16px",
     borderRadius: 16,
@@ -268,16 +266,14 @@ const styles = {
     background: "#007bff",
     color: "#fff",
     cursor: "pointer",
-    width: "auto", // keep default
+    width: "auto",
   },
-
   searchInput: {
     width: "100%",
     padding: 6,
     borderRadius: 8,
     border: "1px solid #ccc",
   },
-
   list: { listStyle: "none", padding: 0, margin: 0, fontSize: 14 },
 };
 
