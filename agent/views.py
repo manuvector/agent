@@ -1,70 +1,28 @@
 # agent/views.py
 import json, os, time, requests
 from urllib.parse import urlencode
+from collections import defaultdict
+import io, pdfminer.high_level
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponseRedirect
 from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.middleware.csrf import get_token
 from django.db import connection
 
 from openai import OpenAI
 from pgvector.psycopg import register_vector
 
-from .models import DriveAuth, UserFile
-from .drive_ingest import ingest_drive_file  # ← NEW
+from agent.models import DriveAuth, UserFile
+from agent.drive_ingest import ingest_drive_file
+from rag.models import RagChunk
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-_register_done = False
+EMBED_MODEL = "text-embedding-3-small"
 
-
-# ─── basic RAG search ───────────────────────────────────────────────────────
-def get_relevant_context(q: str, k: int = 1):
-    global _register_done
-    emb = client.embeddings.create(
-        model="text-embedding-3-small", input=q
-    ).data[0].embedding
-
-    with connection.cursor() as cur:
-        if not _register_done:
-            register_vector(cur.connection)
-            _register_done = True
-        cur.execute(
-            "SELECT content FROM rag_document ORDER BY embedding <-> %s::vector LIMIT %s",
-            [emb, k],
-        )
-        return [row[0] for row in cur.fetchall()]
-
-
-@csrf_exempt
-@require_POST
-def chat_completion(request):
-    msg = json.loads(request.body).get("message", "").strip()
-    if not msg:
-        return JsonResponse({"response": "Please enter a message."})
-
-    docs = get_relevant_context(msg, 3)
-    ctx = "".join(f"<doc>{c}</doc>\n" for c in docs)
-
-    reply = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Answer using the context below. "
-                    "If irrelevant, answer normally.\n" + ctx
-                ),
-            },
-            {"role": "user", "content": msg},
-        ],
-    ).choices[0].message.content.strip()
-
-    return JsonResponse({"response": reply})
-
-
-# ─── Google Drive OAuth flow ────────────────────────────────────────────────
+# ───────── OAuth helpers ─────────
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 
 
@@ -79,9 +37,8 @@ def drive_connect(request):
         "access_type": "offline",
         "prompt": "consent",
     }
-    return HttpResponseRedirect(
-        "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
-    )
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+    return HttpResponseRedirect(url)
 
 
 @login_required
@@ -135,7 +92,6 @@ def _valid_token(user):
     return auth.access_token
 
 
-# ─── API endpoints for Picker ───────────────────────────────────────────────
 @login_required
 @require_GET
 def drive_token(request):
@@ -150,10 +106,9 @@ def drive_token(request):
 def store_selected_files(request):
     """
     Payload: {files:[{id,name},...]}
-    • Saves metadata
-    • Immediately ingests each file into the vector DB
+    Saves metadata + ingests embeddings/offsets only.
     """
-    payload = json.loads(request.body)
+    payload = json.loads(request.body or "{}")
     files = payload.get("files") or []
     if not files:
         return JsonResponse({"error": "No files"}, status=400)
@@ -164,15 +119,126 @@ def store_selected_files(request):
 
     ingested = 0
     for f in files:
-        uf, _ = UserFile.objects.update_or_create(
+        UserFile.objects.update_or_create(
             user=request.user, file_id=f["id"], defaults={"name": f["name"]}
         )
         try:
             ingest_drive_file(request.user, f["id"], token)
             ingested += 1
-        except Exception as e:
-            # log or print(e) for debugging
+        except Exception:
             continue
 
     return JsonResponse({"stored": len(files), "ingested": ingested})
+
+
+# ───────── RAG retrieval ─────────
+def _embed_query(q):
+    return client.embeddings.create(model=EMBED_MODEL, input=q).data[0].embedding
+
+def _export_drive_text(file_id: str, token: str) -> str:
+    hdrs = {"Authorization": f"Bearer {token}"}
+    meta = requests.get(
+        f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=name,mimeType",
+        headers=hdrs,
+        timeout=30,
+    ).json()
+    name = meta["name"]
+    mime = meta["mimeType"]
+
+    if mime.startswith("application/vnd.google-apps"):
+        export_map = {
+            "application/vnd.google-apps.document": "text/plain",
+            "application/vnd.google-apps.presentation": "text/plain",
+            "application/vnd.google-apps.spreadsheet": "text/csv",
+        }
+        export_mime = export_map.get(mime)
+        if not export_mime:
+            return ""
+        url = (
+            f"https://www.googleapis.com/drive/v3/files/{file_id}/export"
+            f"?mimeType={export_mime}"
+        )
+    else:
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+
+    data = requests.get(url, headers=hdrs, timeout=120).content
+
+    if mime == "application/pdf" or name.lower().endswith(".pdf"):
+        return pdfminer.high_level.extract_text(io.BytesIO(data))
+    return data.decode("utf-8", errors="ignore")
+
+
+def get_relevant_context(q: str, user, k: int = 3):
+    emb = _embed_query(q)
+    with connection.cursor() as cur:
+        register_vector(cur.connection)
+        cur.execute(
+            """
+            SELECT file_id, char_start, char_end
+            FROM rag_ragchunk
+            WHERE user_id = %s
+            ORDER BY embedding <-> %s::vector
+            LIMIT %s
+            """,
+            [user.id, emb, k],
+        )
+        rows = cur.fetchall()
+
+    if not rows:
+        return []
+
+    token = _valid_token(user)
+    if not token:
+        return []
+
+    # group by file_id
+    chunks_by_file = defaultdict(list)
+    for file_id, start, end in rows:
+        chunks_by_file[file_id].append((start, end))
+
+    contexts = []
+    for file_id, ranges in chunks_by_file.items():
+        full_text = _export_drive_text(file_id, token)
+        for start, end in ranges:
+            contexts.append(full_text[start:end])
+
+    return contexts[:k]
+
+
+@require_POST
+def chat_completion(request):
+    data = json.loads(request.body or "{}")
+    msg = data.get("message", "").strip()
+    if not msg:
+        return JsonResponse({"response": "Please enter a message."})
+
+    docs = get_relevant_context(msg, request.user, 3)
+    ctx = "".join(f"<doc>{c}</doc>\n" for c in docs)
+
+    reply = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Answer using the context below. If irrelevant, answer normally.\n" + ctx
+                ),
+            },
+            {"role": "user", "content": msg},
+        ],
+    ).choices[0].message.content.strip()
+
+    return JsonResponse({"response": reply})
+
+
+# ───────── CSRF helpers ─────────
+@ensure_csrf_cookie
+def index_with_csrf(request):
+    from django.shortcuts import render
+    return render(request, "index.html")
+
+
+@require_GET
+def get_csrf_token(request):
+    return JsonResponse({"csrfToken": get_token(request)})
 

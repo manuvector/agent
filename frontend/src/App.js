@@ -3,34 +3,40 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// Expose your GCP API key as REACT_APP_GOOGLE_DEVELOPER_KEY=XXXX
 const DEVELOPER_KEY = process.env.REACT_APP_GOOGLE_DEVELOPER_KEY;
 
+// --- CSRF helper ---
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 export default function App() {
-  /* ───── State ───── */
-  const [messages, setMessages]   = useState([]);
-  const [input, setInput]         = useState("");
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
   const [chatLoading, setLoading] = useState(false);
 
-  const [files, setFiles]   = useState([]);
+  const [files, setFiles] = useState([]);
   const [search, setSearch] = useState("");
-  const fetchTimer          = useRef(null);
+  const fetchTimer = useRef(null);
 
-  // Google Picker boot state
   const [pickerReady, setPickerReady] = useState(false);
+
+  /* ───── ensure CSRF cookie exists ───── */
+  useEffect(() => {
+    // Ping Django to set CSRF cookie
+    fetch("/api/csrf", { credentials: "include" }).catch(() => {});
+  }, []);
 
   /* ───── Google Picker bootstrap ───── */
   useEffect(() => {
-    // Helper: runs after gapi is on the page
     const initPicker = () => {
       window.gapi.load("picker", { callback: () => setPickerReady(true) });
     };
 
     if (window.gapi) {
-      // Script already present
       initPicker();
     } else {
-      // Inject script, then init
       const s = document.createElement("script");
       s.src = "https://apis.google.com/js/api.js";
       s.onload = initPicker;
@@ -41,19 +47,38 @@ export default function App() {
   const openDrivePicker = useCallback(async () => {
     if (!pickerReady) return;
 
-    // 1️⃣ Get a short‑lived token from your backend
-    const res = await fetch("/api/drive/token");
-    if (res.status === 400) {
-      window.location.href = "/connect/drive/"; // start OAuth
+    let res;
+    try {
+      res = await fetch("/api/drive/token", {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+    } catch {
+      alert("Network error contacting server");
       return;
     }
-    if (!res.ok) {
-      alert("Could not obtain Google Drive token");
-      return;
-    }
-    const { token } = await res.json();
 
-    // 2️⃣ Build Picker
+    if (res.redirected) {
+      window.location.href = res.url;
+      return;
+    }
+    if (res.status === 400) {
+      window.location.href = "/connect/drive/";
+      return;
+    }
+
+    const ctype = res.headers.get("content-type") || "";
+    if (!ctype.includes("application/json")) {
+      window.location.href = "/accounts/login/?next=/chat";
+      return;
+    }
+
+    const { token } = await res.json();
+    if (!token) {
+      alert("No Drive token received");
+      return;
+    }
+
     const view = new window.google.picker.DocsView()
       .setIncludeFolders(true)
       .setSelectFolderEnabled(true);
@@ -69,10 +94,14 @@ export default function App() {
           const picked = data.docs.map(d => ({ id: d.id, name: d.name }));
           await fetch("/api/drive/files", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken"),
+              Accept: "application/json",
+            },
             body: JSON.stringify({ files: picked }),
           });
-          // Optimistic UI update
           setFiles(prev => [
             ...prev,
             ...picked.map(p => ({ file_name: p.name, chunks: "Drive" })),
@@ -95,7 +124,12 @@ export default function App() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+          Accept: "application/json",
+        },
         body: JSON.stringify({ message: input }),
       });
       if (!res.ok) throw new Error();
@@ -117,7 +151,7 @@ export default function App() {
   /* ───── Files list: initial load ───── */
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/files");
+      const res = await fetch("/api/files", { credentials: "include" });
       if (res.ok) setFiles(await res.json());
     })();
   }, []);
@@ -129,16 +163,14 @@ export default function App() {
       const url = search.trim()
         ? `/api/files?q=${encodeURIComponent(search)}`
         : "/api/files";
-      const res = await fetch(url);
+      const res = await fetch(url, { credentials: "include" });
       if (res.ok) setFiles(await res.json());
     }, 300);
     return () => clearTimeout(fetchTimer.current);
   }, [search]);
 
-  /* ───── UI ───── */
   return (
     <div style={styles.layout}>
-      {/* ───── Sidebar ───── */}
       <aside style={styles.sidebar}>
         <input
           value={search}
@@ -162,14 +194,13 @@ export default function App() {
         <h4 style={{ marginTop: 24 }}>Add knowledge</h4>
         {pickerReady ? (
           <button style={{ ...styles.btn, width: "100%" }} onClick={openDrivePicker}>
-            Connect Google Drive
+            Connect Google Drive
           </button>
         ) : (
-          <span style={{ fontSize: 12 }}>Loading Google Picker…</span>
+          <span style={{ fontSize: 12 }}>Loading Google Picker…</span>
         )}
       </aside>
 
-      {/* ───── Main column ───── */}
       <div style={styles.wrapper}>
         <h2>Chat with your docs</h2>
 
@@ -216,7 +247,7 @@ export default function App() {
   );
 }
 
-/* ───── Inline styles ───── */
+/* Styles */
 const styles = {
   layout: { display: "flex", height: "100%" },
   sidebar: {

@@ -3,6 +3,13 @@ import os
 from pathlib import Path
 
 
+CSRF_TRUSTED_ORIGINS = ["https://manuvector.net", "http://localhost:8000"]
+CSRF_COOKIE_NAME = "csrftoken"
+CSRF_COOKIE_HTTPONLY = False          # <-- allow JS to read it
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SAMESITE = "Lax"
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = True

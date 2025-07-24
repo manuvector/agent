@@ -7,18 +7,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      REACT_APP_GOOGLE_DEVELOPER_KEY: ${REACT_APP_GOOGLE_DEVELOPER_KEY}
-
-    healthcheck:
-      # CMD-SHELL lets us use $var without YAML quoting headaches
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
 
   web:
     build: .
@@ -26,9 +23,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    env_file: .env            # secrets such as OPENAI_API_KEY
+    env_file: .env
     environment:
-      DB_HOST:              db                  # used by entrypoint.sh
+      DB_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-ragdb}
       POSTGRES_USER: ${POSTGRES_USER:-raguser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ragpass}
@@ -38,7 +35,6 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     ports:
       - "8000:8000"
-    # No "command:" override – entrypoint handles migrations + runserver
 
 volumes:
   pgdata:
