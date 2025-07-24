@@ -23,7 +23,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 EMBED_MODEL = "text-embedding-3-small"
 
 # ───────── OAuth helpers ─────────
-DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 
 
 @login_required
