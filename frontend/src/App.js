@@ -1,22 +1,28 @@
-// frontend/src/App.js
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const DEVELOPER_KEY = process.env.REACT_APP_GOOGLE_DEVELOPER_KEY;
 
-// --- CSRF helper ---
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return match ? decodeURIComponent(match[2]) : null;
-}
+// ───────── helpers ─────────
+const getCookie = (name) => {
+  const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return m ? decodeURIComponent(m[2]) : null;
+};
 
+// ────────────────────────────────────────────────────────────────────────────────
 export default function App() {
+  /* ───── state ───── */
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [input,    setInput]    = useState("");
   const [chatLoading, setLoading] = useState(false);
 
-  const [files, setFiles] = useState([]);
+  const [files, setFiles]   = useState([]);
   const [search, setSearch] = useState("");
   const fetchTimer = useRef(null);
 
@@ -24,52 +30,39 @@ export default function App() {
 
   /* ───── ensure CSRF cookie exists ───── */
   useEffect(() => {
-    // Ping Django to set CSRF cookie
     fetch("/api/csrf", { credentials: "include" }).catch(() => {});
   }, []);
 
-  /* ───── Google Picker bootstrap ───── */
+  /* ───── bootstrap Google Picker ───── */
   useEffect(() => {
-    const initPicker = () => {
+    const initPicker = () =>
       window.gapi.load("picker", { callback: () => setPickerReady(true) });
-    };
 
     if (window.gapi) {
       initPicker();
     } else {
       const s = document.createElement("script");
-      s.src = "https://apis.google.com/js/api.js";
+      s.src   = "https://apis.google.com/js/api.js";
       s.onload = initPicker;
       document.body.appendChild(s);
     }
   }, []);
 
-  const openDrivePicker = useCallback(async () => {
-    if (!pickerReady) return;
-
+  /* ───────── core: fetch token + open picker ───────── */
+  const fetchTokenAndOpenPicker = useCallback(async () => {
     let res;
     try {
       res = await fetch("/api/drive/token", {
         credentials: "include",
-        headers: { Accept: "application/json" },
+        headers:     { Accept: "application/json" },
       });
     } catch {
       alert("Network error contacting server");
       return;
     }
 
-    if (res.redirected) {
-      window.location.href = res.url;
-      return;
-    }
-    if (res.status === 400) {
-      window.location.href = "/connect/drive/";
-      return;
-    }
-
-    const ctype = res.headers.get("content-type") || "";
-    if (!ctype.includes("application/json")) {
-      window.location.href = "/accounts/login/?next=/chat";
+    if (!res.ok) {
+      alert("Could not obtain Drive token.");
       return;
     }
 
@@ -89,57 +82,86 @@ export default function App() {
       .setDeveloperKey(DEVELOPER_KEY)
       .setOAuthToken(token)
       .setOrigin(window.location.origin)
-      .setCallback(async data => {
+      .setCallback(async (data) => {
         if (data.action === window.google.picker.Action.PICKED) {
-          const picked = data.docs.map(d => ({ id: d.id, name: d.name }));
+          const picked = data.docs.map((d) => ({ id: d.id, name: d.name }));
           await fetch("/api/drive/files", {
-            method: "POST",
+            method:      "POST",
             credentials: "include",
             headers: {
               "Content-Type": "application/json",
-              "X-CSRFToken": getCookie("csrftoken"),
-              Accept: "application/json",
+              "X-CSRFToken":  getCookie("csrftoken"),
+              Accept:         "application/json",
             },
             body: JSON.stringify({ files: picked }),
           });
-          setFiles(prev => [
+          setFiles((prev) => [
             ...prev,
-            ...picked.map(p => ({ file_name: p.name, chunks: "Drive" })),
+            ...picked.map((p) => ({ file_name: p.name, chunks: "Drive" })),
           ]);
         }
       })
       .build();
+
     picker.setVisible(true);
+  }, []);
+
+  /* ───────── button handler – starts full redirect round‑trip ───────── */
+  const openDrivePicker = useCallback(() => {
+    if (!pickerReady) return;
+    // We want the OAuth round‑trip only once; afterwards we’ll land back on
+    // /chat?picker=1 and auto‑launch the picker.
+    const tgt = `/api/drive/token?${new URLSearchParams({
+      next: encodeURIComponent("/chat?picker=1"),
+    }).toString()}`;
+    window.location.href = tgt;
   }, [pickerReady]);
 
-  /* ───── Chat helpers ───── */
-  const handleSend = async e => {
+  /* ───── auto‑launch after OAuth ───── */
+  useEffect(() => {
+    if (!pickerReady) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("picker") === "1") {
+      // remove the flag so we don't loop on every refresh
+      params.delete("picker");
+      const newQuery = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (newQuery ? "?" + newQuery : "")
+      );
+      fetchTokenAndOpenPicker();
+    }
+  }, [pickerReady, fetchTokenAndOpenPicker]);
+
+  /* ───── chat helpers ───── */
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    setMessages(prev => [...prev, { from: "user", text: input }]);
+    setMessages((prev) => [...prev, { from: "user", text: input }]);
     setInput("");
     setLoading(true);
 
     try {
       const res = await fetch("/api/chat", {
-        method: "POST",
+        method:      "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "X-CSRFToken": getCookie("csrftoken"),
-          Accept: "application/json",
+          "X-CSRFToken":  getCookie("csrftoken"),
+          Accept:         "application/json",
         },
         body: JSON.stringify({ message: input }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
         { from: "bot", text: data.response || "(no response)" },
       ]);
     } catch {
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
         { from: "bot", text: "Sorry, there was an error contacting the server." },
       ]);
@@ -148,7 +170,7 @@ export default function App() {
     }
   };
 
-  /* ───── Files list: initial load ───── */
+  /* ───── Files list: initial & search ───── */
   useEffect(() => {
     (async () => {
       const res = await fetch("/api/files", { credentials: "include" });
@@ -156,7 +178,6 @@ export default function App() {
     })();
   }, []);
 
-  /* ───── Files list: live similarity search ───── */
   useEffect(() => {
     if (fetchTimer.current) clearTimeout(fetchTimer.current);
     fetchTimer.current = setTimeout(async () => {
@@ -169,23 +190,28 @@ export default function App() {
     return () => clearTimeout(fetchTimer.current);
   }, [search]);
 
+  /* ───── render ───── */
   return (
     <div style={styles.layout}>
       <aside style={styles.sidebar}>
         <input
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Semantic search…"
           style={styles.searchInput}
         />
 
         <h4 style={{ marginTop: 16 }}>Knowledge files</h4>
         <ul style={styles.list}>
-          {files.map(f => (
+          {files.map((f) => (
             <li key={f.file_name}>
-              {f.file_name} <small>{f.chunks && `(${f.chunks})`}</small>
+              {f.file_name}{" "}
+              <small>{f.chunks && `(${f.chunks})`}</small>
               {f.distance !== undefined && (
-                <small style={{ color: "#888" }}> – {f.distance.toFixed(2)}</small>
+                <small style={{ color: "#888" }}>
+                  {" "}
+                  – {f.distance.toFixed(2)}
+                </small>
               )}
             </li>
           ))}
@@ -193,7 +219,10 @@ export default function App() {
 
         <h4 style={{ marginTop: 24 }}>Add knowledge</h4>
         {pickerReady ? (
-          <button style={{ ...styles.btn, width: "100%" }} onClick={openDrivePicker}>
+          <button
+            style={{ ...styles.btn, width: "100%" }}
+            onClick={openDrivePicker}
+          >
             Connect Google Drive
           </button>
         ) : (
@@ -206,7 +235,10 @@ export default function App() {
 
         <div style={styles.chatBox}>
           {messages.map((m, i) => (
-            <div key={i} style={{ textAlign: m.from === "user" ? "right" : "left" }}>
+            <div
+              key={i}
+              style={{ textAlign: m.from === "user" ? "right" : "left" }}
+            >
               {m.from === "bot" ? (
                 <div
                   style={{
@@ -215,10 +247,14 @@ export default function App() {
                     maxWidth: "80%",
                   }}
                 >
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {m.text}
+                  </ReactMarkdown>
                 </div>
               ) : (
-                <span style={{ ...styles.bubble, background: "#daf1fc" }}>{m.text}</span>
+                <span style={{ ...styles.bubble, background: "#daf1fc" }}>
+                  {m.text}
+                </span>
               )}
             </div>
           ))}
@@ -233,7 +269,7 @@ export default function App() {
           <input
             type="text"
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message…"
             style={styles.input}
             disabled={chatLoading}
@@ -247,7 +283,7 @@ export default function App() {
   );
 }
 
-/* Styles */
+/* ───────── styles ───────── */
 const styles = {
   layout: { display: "flex", height: "100%" },
   sidebar: {
