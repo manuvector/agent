@@ -31,6 +31,32 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 EMBED_MODEL = "text-embedding-3-small"
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 
+
+@login_required
+@require_GET
+def drive_token(request):
+    """
+    • If the user already has a fresh Drive token:
+        – when the request came via <a href> / window.location (i.e. a *navigation*)
+          and includes a ?next=… param → redirect to that `next` URL.
+        – otherwise (XHR / fetch) → return JSON  {token: …}.
+    • If there's no token yet: redirect to Google OAuth.
+    """
+    token = _valid_token(request.user)
+    next_param = request.GET.get("next")          # may be None
+
+    if token:
+        if next_param:                            # browser navigation branch
+            return redirect(unquote(next_param))
+        return JsonResponse({"token": token})     # XHR / fetch branch
+
+    # ---------- no token yet: kick off OAuth ----------
+    next_target = next_param or "/chat?picker=1"
+    return redirect(
+        f"{reverse('drive_connect')}?{urlencode({'next': next_target})}"
+    )
+
+
 # ────────────────────────────────────────────────────────────────────────────────
 # OAuth helpers
 # ────────────────────────────────────────────────────────────────────────────────
@@ -123,21 +149,6 @@ def _valid_token(user):
 
     return auth.access_token
 
-
-@login_required
-@require_GET
-def drive_token(request):
-    """
-    JSON endpoint: if the user already connected Drive, return the token;
-    otherwise **redirect** to Google OAuth (round‑trip) and come back to /chat.
-    """
-    token = _valid_token(request.user)
-    if token:
-        return JsonResponse({"token": token})
-
-    # We’ll return here after OAuth
-    next_url = request.GET.get("next", "/chat?picker=1")
-    return redirect(f"{reverse('drive_connect')}?{urlencode({'next': next_url})}")
 
 # ────────────────────────────────────────────────────────────────────────────────
 # File ingestion  &  storage

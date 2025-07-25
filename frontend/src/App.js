@@ -1,3 +1,4 @@
+// frontend/src/App.js
 import React, {
   useState,
   useRef,
@@ -9,63 +10,54 @@ import remarkGfm from "remark-gfm";
 
 const DEVELOPER_KEY = process.env.REACT_APP_GOOGLE_DEVELOPER_KEY;
 
-// ───────── helpers ─────────
+/* ───────── helpers ───────── */
 const getCookie = (name) => {
   const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
   return m ? decodeURIComponent(m[2]) : null;
 };
 
-// ────────────────────────────────────────────────────────────────────────────────
 export default function App() {
   /* ───── state ───── */
-  const [messages, setMessages] = useState([]);
-  const [input,    setInput]    = useState("");
+  const [messages, setMessages]   = useState([]);
+  const [input,    setInput]      = useState("");
   const [chatLoading, setLoading] = useState(false);
 
-  const [files, setFiles]   = useState([]);
+  const [files,  setFiles]  = useState([]);
   const [search, setSearch] = useState("");
-  const fetchTimer = useRef(null);
+  const fetchTimer          = useRef(null);
 
   const [pickerReady, setPickerReady] = useState(false);
 
-  /* ───── ensure CSRF cookie exists ───── */
+  /* ───── ensure CSRF cookie ───── */
   useEffect(() => {
     fetch("/api/csrf", { credentials: "include" }).catch(() => {});
   }, []);
 
-  /* ───── bootstrap Google Picker ───── */
+  /* ───── load Google Picker ───── */
   useEffect(() => {
-    const initPicker = () =>
+    const init = () =>
       window.gapi.load("picker", { callback: () => setPickerReady(true) });
 
-    if (window.gapi) {
-      initPicker();
-    } else {
+    if (window.gapi) init();
+    else {
       const s = document.createElement("script");
       s.src   = "https://apis.google.com/js/api.js";
-      s.onload = initPicker;
+      s.onload = init;
       document.body.appendChild(s);
     }
   }, []);
 
-  /* ───────── core: fetch token + open picker ───────── */
+  /* ───── fetch Drive token & open picker ───── */
   const fetchTokenAndOpenPicker = useCallback(async () => {
-    let res;
-    try {
-      res = await fetch("/api/drive/token", {
-        credentials: "include",
-        headers:     { Accept: "application/json" },
-      });
-    } catch {
-      alert("Network error contacting server");
-      return;
-    }
+    const res = await fetch("/api/drive/token", {
+      credentials: "include",
+      headers:     { Accept: "application/json" },
+    });
 
     if (!res.ok) {
-      alert("Could not obtain Drive token.");
+      alert("Could not obtain Drive token");
       return;
     }
-
     const { token } = await res.json();
     if (!token) {
       alert("No Drive token received");
@@ -106,29 +98,29 @@ export default function App() {
     picker.setVisible(true);
   }, []);
 
-  /* ───────── button handler – starts full redirect round‑trip ───────── */
+  /* ───── button click – starts OAuth round‑trip once ───── */
   const openDrivePicker = useCallback(() => {
     if (!pickerReady) return;
-    // We want the OAuth round‑trip only once; afterwards we’ll land back on
-    // /chat?picker=1 and auto‑launch the picker.
-    const tgt = `/api/drive/token?${new URLSearchParams({
-      next: encodeURIComponent("/chat?picker=1"),
+
+    const url = `/api/drive/token?${new URLSearchParams({
+      // let URLSearchParams handle encoding (no double‑encode)
+      next: "/chat?picker=1",
     }).toString()}`;
-    window.location.href = tgt;
+
+    window.location.href = url;
   }, [pickerReady]);
 
-  /* ───── auto‑launch after OAuth ───── */
+  /* ───── auto‑launch picker after returning from OAuth ───── */
   useEffect(() => {
     if (!pickerReady) return;
+
     const params = new URLSearchParams(window.location.search);
     if (params.get("picker") === "1") {
-      // remove the flag so we don't loop on every refresh
       params.delete("picker");
-      const newQuery = params.toString();
       window.history.replaceState(
         {},
         "",
-        window.location.pathname + (newQuery ? "?" + newQuery : "")
+        window.location.pathname + (params.toString() ? `?${params}` : "")
       );
       fetchTokenAndOpenPicker();
     }
