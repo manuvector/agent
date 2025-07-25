@@ -19,40 +19,14 @@
         <header data-bs-theme="dark">
             <nav class="navbar navbar-expand-lg bg-body-tertiary">
                 <div class="container-fluid">
-                        <div class="d-flex flex-row gap-2 justify-content-end ms-auto text-nowrap">
-                            <form class="d-flex" method="post" action="{% url 'set_language' %}">
-                                {% csrf_token %}
-                                {% get_available_languages as LANGUAGES %}
-                                {% get_current_language as LANGUAGE_CODE %}
-                                <label for="language-dropdown" class="visually-hidden">{% translate "Select Language" %}</label>
-                                <select id="language-dropdown"
-                                        aria-label="{% translate 'Select Language' %}"
-                                        name="language"
-                                        onchange="this.form.submit()">
-                                    {% get_language_info_list for LANGUAGES as languages %}
-                                    {% for lang in languages %}
-                                        <option lang="{{ lang.code }}"
-                                                {% if lang.code == LANGUAGE_CODE %}selected{% endif %}
-                                                value="{{ lang.code }}">{{ lang.name_local }}</option>
-                                    {% endfor %}
-                                </select>
-                            </form>
-                            {% if user.is_authenticated %}
-                                {% url 'account_email' as email_url_ %}
-                                {% url 'socialaccount_connections' as socialaccount_url_ %}
-                                {% if email_url_ or socialaccount_url_ %}
-                                    <a href="{% if email_url_ %}{{ email_url_ }}{% else %}{{ socialaccount_url_ }}{% endif %}"
-                                       class="btn btn-secondary">Manage Account</a>
-                                {% endif %}
-                                <a href="{% url 'account_logout' %}" class="btn btn-danger">{% translate "Sign Out" %}</a>
-                            {% else %}
-                                <a href="{% url 'account_login' %}" class="btn btn-outline-light">{% translate "Sign In" %}</a>
-                                {% url 'account_signup' as signup_url_ %}
-                                {% if signup_url_ %}
-                                    <a href="{{ signup_url_ }}" class="btn btn-success">{% translate "Sign Up" %}</a>
-                                {% endif %}
-                            {% endif %}
-                        </div>
+                    <div class="d-flex flex-row gap-2 justify-content-end ms-auto text-nowrap">
+                        {% if user.is_authenticated %}
+                            {% url 'account_email' as email_url_ %}
+                            {% url 'socialaccount_connections' as socialaccount_url_ %}
+                            <a href="{% url 'account_logout' %}" class="btn btn-danger btn-sm">{% translate "Sign Out" %}</a>
+                        {% else %}
+                            <a href="{% url 'account_login' %}" class="btn btn-primary btn-sm">{% translate "Sign In" %}</a>
+                        {% endif %}
                     </div>
                 </div>
             </nav>
@@ -68,3 +42,4 @@
                 crossorigin="anonymous"></script>
     </body>
 </html>
+
