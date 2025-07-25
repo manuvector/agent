@@ -14,4 +14,5 @@ docker-compose exec web python manage.py makemigrations
 docker-compose exec web python manage.py migrate
 docker-compose exec web python manage.py makemigrations rag
 docker-compose exec web python manage.py migrate rag
-
+docker-compose exec web python manage.py makemigrations agent
+docker-compose exec web python manage.py migrate agent
