@@ -1,34 +1,41 @@
-# agent/views.py
 import io, json, os, time, requests, pdfminer.high_level
 from collections import defaultdict
 from urllib.parse import urlencode, parse_qs, unquote
 
+from django.conf               import settings
 from django.contrib.auth.decorators import login_required
-from django.db import connection
-from django.http import JsonResponse, HttpResponseRedirect
-from django.middleware.csrf import get_token
-from django.shortcuts import redirect, render
-from django.urls import reverse
-from django.views.decorators.http import require_GET, require_POST
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.db                 import connection
+from django.http               import JsonResponse, HttpResponseRedirect
+from django.middleware.csrf    import get_token
+from django.shortcuts          import redirect, render
+from django.urls               import reverse
+from django.views.decorators.http  import require_GET, require_POST
+from django.views.decorators.csrf  import ensure_csrf_cookie
 
-from openai import OpenAI
-from pgvector.psycopg import register_vector
+from openai                    import OpenAI
+from pgvector.psycopg          import register_vector
 
-from agent.models import DriveAuth, NotionAuth, UserFile         # ← NEW
-from agent.ingest import ingest_drive_file, ingest_notion_page   # ← NEW
-from rag.models import RagChunk
+from agent.models  import DriveAuth, NotionAuth, UserFile
+from agent.ingest  import ingest_drive_file, ingest_notion_page
+from rag.models    import RagChunk
+
 
 # ─────────────────────────
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-EMBED_MODEL  = "text-embedding-3-small"
-DRIVE_SCOPE  = "https://www.googleapis.com/auth/drive.file"
-NOTION_SCOPE = "read:content,search:read"                        # ← NEW
-NOTION_BASE  = "https://api.notion.com/v1"                       # ← NEW
-NOTION_REDIRECT_URI = "https://manuvector.net/accounts/notion/login/callback/"
+client         = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+EMBED_MODEL    = "text-embedding-3-small"
+DRIVE_SCOPE    = "https://www.googleapis.com/auth/drive.file"
+NOTION_SCOPE   = "read:content,search:read"
+NOTION_BASE    = "https://api.notion.com/v1"
+
+# Helpers – pick the hard‑coded URI in prod, dynamic in dev
+def _abs_uri(request, name, fallback):
+    if settings.DEBUG:
+        return request.build_absolute_uri(reverse(name))
+    return fallback
+
 
 # =============================================================================
-#   1. DRIVE  ──────────────────────────────────────────────────────────────────
+# 1. GOOGLE DRIVE
 # =============================================================================
 @login_required
 @require_GET
@@ -48,14 +55,15 @@ def drive_connect(request):
     params = {
         "client_id":     os.getenv("GOOGLE_CLIENT_ID"),
         "response_type": "code",
-        "redirect_uri":  request.build_absolute_uri(reverse("drive_callback")),
+        "redirect_uri":  _abs_uri(request, "drive_callback", settings.DRIVE_REDIRECT_URI),
         "scope":         DRIVE_SCOPE,
         "access_type":   "offline",
         "prompt":        "consent",
         "state":         urlencode({"next": nxt}),
     }
-    return HttpResponseRedirect("https://accounts.google.com/o/oauth2/v2/auth?" +
-                                urlencode(params))
+    return HttpResponseRedirect(
+        "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+    )
 
 
 @login_required
@@ -64,17 +72,19 @@ def drive_callback(request):
     code = request.GET.get("code")
     if not code:
         return JsonResponse({"error": "Missing code"}, status=400)
+
     token_res = requests.post(
         "https://oauth2.googleapis.com/token",
         data={
-            "code":         code,
-            "client_id":    os.getenv("GOOGLE_CLIENT_ID"),
-            "client_secret":os.getenv("GOOGLE_CLIENT_SECRET"),
-            "redirect_uri": request.build_absolute_uri(reverse("drive_callback")),
-            "grant_type":   "authorization_code",
+            "code":          code,
+            "client_id":     os.getenv("GOOGLE_CLIENT_ID"),
+            "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "redirect_uri":  _abs_uri(request, "drive_callback", settings.DRIVE_REDIRECT_URI),
+            "grant_type":    "authorization_code",
         },
         timeout=30,
     ).json()
+
     DriveAuth.objects.update_or_create(
         user=request.user,
         defaults={
@@ -83,6 +93,7 @@ def drive_callback(request):
             "expiry_ts":     time.time() + token_res.get("expires_in", 0),
         },
     )
+
     nxt = "/chat"
     if "state" in request.GET:
         qs = parse_qs(request.GET["state"])
@@ -111,16 +122,11 @@ def _valid_drive_token(user):
     return auth.access_token
 
 
-# -----------------------------------------------------------------------------
-# File store
-# -----------------------------------------------------------------------------
 @login_required
 @require_POST
 def store_selected_files(request):
-    """
-    Payload Drive:  {"files":[{"id":…, "name":…}]}
-    """
-    files  = (json.loads(request.body or "{}")).get("files") or []
+    """POST {"files":[{"id":…,"name":…}]} to ingest Drive files."""
+    files = (json.loads(request.body or "{}")).get("files") or []
     if not files:
         return JsonResponse({"error": "No files"}, status=400)
 
@@ -131,8 +137,7 @@ def store_selected_files(request):
     ing = 0
     for f in files:
         UserFile.objects.update_or_create(
-            user=request.user, file_id=f["id"],
-            defaults={"name": f["name"]}
+            user=request.user, file_id=f["id"], defaults={"name": f["name"]}
         )
         try:
             ingest_drive_file(request.user, f["id"], token)
@@ -141,8 +146,9 @@ def store_selected_files(request):
             continue
     return JsonResponse({"stored": len(files), "ingested": ing})
 
+
 # =============================================================================
-#   2. NOTION  ─────────────────────────────────────────────────────────────────
+# 2. NOTION
 # =============================================================================
 @login_required
 @require_GET
@@ -162,7 +168,7 @@ def notion_connect(request):
     params = {
         "client_id":     os.getenv("NOTION_CLIENT_ID"),
         "response_type": "code",
-        "redirect_uri":  request.build_absolute_uri(reverse("notion_callback")),
+        "redirect_uri":  _abs_uri(request, "notion_callback", settings.NOTION_REDIRECT_URI),
         "scope":         NOTION_SCOPE,
         "owner":         "user",
         "state":         urlencode({"next": nxt}),
@@ -176,18 +182,20 @@ def notion_callback(request):
     code = request.GET.get("code")
     if not code:
         return JsonResponse({"error": "Missing code"}, status=400)
+
     res = requests.post(
         f"{NOTION_BASE}/oauth/token",
         headers={"Content-Type": "application/json"},
         json={
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "redirect_uri":  NOTION_REDIRECT_URI,#request.build_absolute_uri(reverse("notion_callback")),
-            "client_id":     os.getenv("NOTION_CLIENT_ID"),
+            "grant_type": "authorization_code",
+            "code":       code,
+            "redirect_uri": _abs_uri(request, "notion_callback", settings.NOTION_REDIRECT_URI),
+            "client_id":  os.getenv("NOTION_CLIENT_ID"),
             "client_secret": os.getenv("NOTION_CLIENT_SECRET"),
         },
         timeout=30,
     ).json()
+
     NotionAuth.objects.update_or_create(
         user=request.user,
         defaults={
@@ -197,6 +205,7 @@ def notion_callback(request):
             "expiry_ts":     time.time() + res.get("expires_in", 0),
         },
     )
+
     nxt = "/chat"
     if "state" in request.GET:
         qs = parse_qs(request.GET["state"])
@@ -226,9 +235,6 @@ def _valid_notion_token(user):
     return auth.access_token
 
 
-# -----------------------------------------------------------------------------
-# Notion search + ingestion endpoints
-# -----------------------------------------------------------------------------
 @login_required
 @require_GET
 def notion_pages(request):
@@ -277,6 +283,8 @@ def store_notion_pages(request):
         except Exception:
             continue
     return JsonResponse({"stored": len(pages), "ingested": ing})
+
+
 
 # =============================================================================
 #   3. COMMON RAG / CHAT
