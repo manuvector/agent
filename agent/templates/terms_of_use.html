@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Use</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+    }
+    h1, h2 {
+      color: #222;
+    }
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Terms of Use</h1>
+  <p><em>Last updated: {{ date|default:"2025-07-26" }}</em></p>
+
+  <p>Welcome to [Your App Name]! By using our service, you agree to the following terms. 
+     If you do not agree, please do not use the app.</p>
+
+  <h2>1. What this app does</h2>
+  <ul>
+    <li>Connect your own Google Drive and Notion accounts.</li>
+    <li>Choose specific files or pages to include as context for AI-powered chat.</li>
+    <li>Chat with an AI that uses the content of those files to help answer your questions.</li>
+  </ul>
+
+  <h2>2. Your data</h2>
+  <ul>
+    <li><strong>Your content belongs to you.</strong> Files from Drive or Notion are processed temporarily
+        to extract plain text and create embeddings (mathematical summaries). These embeddings are stored
+        in our database so the AI can retrieve context later.</li>
+    <li><strong>We do not share your files.</strong> The content and embeddings are private to your account and
+        are not shared with other users.</li>
+    <li><strong>Access tokens</strong> (for Drive and Notion) are securely stored so that you can reuse the
+        connection without logging in each time. These tokens can be revoked at any time from your
+        Google or Notion account settings.</li>
+  </ul>
+
+  <h2>3. How the AI works</h2>
+  <p>The AI generates responses based on the content of your files and general knowledge.</p>
+  <p><strong>No guarantees:</strong> Responses may be inaccurate or incomplete. You are responsible
+     for verifying any important information.</p>
+
+  <h2>4. Limitations and responsibilities</h2>
+  <ul>
+    <li>You agree not to upload or connect files that violate the law, contain harmful content,
+        or that you are not authorized to use.</li>
+    <li>We are not responsible for any loss, damage, or consequences caused by using the app.</li>
+  </ul>
+
+  <h2>5. Privacy</h2>
+  <p>We collect only the information necessary to provide the service (account credentials, file embeddings, and logs).
+     For details on data handling, see our <a href="/privacy-policy/">Privacy Policy</a>.</p>
+
+  <h2>6. Termination</h2>
+  <p>We may suspend or terminate accounts that abuse the service or violate these terms.</p>
+
+  <h2>7. Changes</h2>
+  <p>These terms may be updated from time to time. If we make changes, we will post the updated version here.</p>
+
+  <h2>Contact</h2>
+  <p>If you have questions about these terms, contact: [your email/contact page]</p>
+</body>
+</html>
+
