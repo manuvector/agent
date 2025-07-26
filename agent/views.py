@@ -185,7 +185,10 @@ def notion_callback(request):
 
     res = requests.post(
         f"{NOTION_BASE}/oauth/token",
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json",
+                "Authorization": _basic_auth_header(),      #  ← NEW
+
+                 },
         json={
             "grant_type": "authorization_code",
             "code":       code,
@@ -220,7 +223,12 @@ def _valid_notion_token(user):
     if auth.expiry_ts <= time.time() + 60 and auth.refresh_token:
         res = requests.post(
             f"{NOTION_BASE}/oauth/token",
-            headers={"Content-Type": "application/json"},
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": _basic_auth_header(),      #  ← NEW
+            }
+
+
             json={
                 "grant_type":    "refresh_token",
                 "refresh_token": auth.refresh_token,
