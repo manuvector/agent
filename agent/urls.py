@@ -38,6 +38,7 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     path("accounts/profile/", TemplateView.as_view(template_name="profile.html")),
     path("privacy-policy/", TemplateView.as_view(template_name="privacy_policy.html"), name="privacy-policy"),
+    path("terms-of-use/", TemplateView.as_view(template_name="terms_of_use.html"), name="terms-of-use"),
 
     # ───────── Django admin ─────────
     path("admin/", admin.site.urls),
@@ -66,5 +67,5 @@ urlpatterns = [
     path("api/notion/token",          notion_token,         name="notion_token"),
     path("api/notion/pages",          notion_pages,         name="notion_pages"),
     path("api/notion/files",          store_notion_pages,   name="store_notion_pages"),
-]
+    ]
 
