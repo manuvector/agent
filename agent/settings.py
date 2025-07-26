@@ -197,6 +197,16 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
+SOCIALACCOUNT_PROVIDERS["notion"] = {
+    "APP": {
+        "client_id": os.getenv("NOTION_CLIENT_ID"),
+        "secret": os.getenv("NOTION_CLIENT_SECRET"),
+        "key": "",
+    },
+    # no default scopes needed
+}
+
+
 
 ROOT_URLCONF = "agent.urls"
 
@@ -221,6 +231,7 @@ INSTALLED_APPS = (
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.linkedin_oauth2",
+    "allauth.socialaccount.providers.notion",
     "allauth.socialaccount.providers.mediawiki",
     "allauth.socialaccount.providers.pinterest",
     "allauth.socialaccount.providers.pocket",
