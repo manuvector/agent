@@ -25,6 +25,7 @@ EMBED_MODEL  = "text-embedding-3-small"
 DRIVE_SCOPE  = "https://www.googleapis.com/auth/drive.file"
 NOTION_SCOPE = "read:content,search:read"                        # ← NEW
 NOTION_BASE  = "https://api.notion.com/v1"                       # ← NEW
+NOTION_REDIRECT_URI = "https://manuvector.net/accounts/notion/login/callback/"
 
 # =============================================================================
 #   1. DRIVE  ──────────────────────────────────────────────────────────────────
@@ -181,7 +182,7 @@ def notion_callback(request):
         json={
             "grant_type":    "authorization_code",
             "code":          code,
-            "redirect_uri":  request.build_absolute_uri(reverse("notion_callback")),
+            "redirect_uri":  NOTION_REDIRECT_URI,#request.build_absolute_uri(reverse("notion_callback")),
             "client_id":     os.getenv("NOTION_CLIENT_ID"),
             "client_secret": os.getenv("NOTION_CLIENT_SECRET"),
         },
