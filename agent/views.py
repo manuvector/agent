@@ -1,3 +1,4 @@
+import base64
 import io, json, os, time, requests, pdfminer.high_level
 from collections import defaultdict
 from urllib.parse import urlencode, parse_qs, unquote
@@ -27,11 +28,19 @@ DRIVE_SCOPE    = "https://www.googleapis.com/auth/drive.file"
 NOTION_SCOPE   = "read:content,search:read"
 NOTION_BASE    = "https://api.notion.com/v1"
 
-# Helpers – pick the hard‑coded URI in prod, dynamic in dev
+
+# ------------------------------------------------------------------ helpers ---
 def _abs_uri(request, name, fallback):
+    """Dynamic in DEBUG, hard‑coded in prod."""
     if settings.DEBUG:
         return request.build_absolute_uri(reverse(name))
     return fallback
+
+
+def _basic_auth_header() -> str:
+    """Return 'Basic base64(client_id:client_secret)' for Notion OAuth."""
+    creds = f"{os.getenv('NOTION_CLIENT_ID')}:{os.getenv('NOTION_CLIENT_SECRET')}"
+    return "Basic " + base64.b64encode(creds.encode()).decode()
 
 
 # =============================================================================
@@ -185,19 +194,20 @@ def notion_callback(request):
 
     res = requests.post(
         f"{NOTION_BASE}/oauth/token",
-        headers={"Content-Type": "application/json",
-                "Authorization": _basic_auth_header(),      #  ← NEW
-
-                 },
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": _basic_auth_header(),
+        },
         json={
-            "grant_type": "authorization_code",
-            "code":       code,
+            "grant_type":   "authorization_code",
+            "code":         code,
             "redirect_uri": _abs_uri(request, "notion_callback", settings.NOTION_REDIRECT_URI),
-            "client_id":  os.getenv("NOTION_CLIENT_ID"),
-            "client_secret": os.getenv("NOTION_CLIENT_SECRET"),
         },
         timeout=30,
     ).json()
+
+    if "access_token" not in res:
+        return JsonResponse(res, status=400)
 
     NotionAuth.objects.update_or_create(
         user=request.user,
@@ -223,17 +233,13 @@ def _valid_notion_token(user):
     if auth.expiry_ts <= time.time() + 60 and auth.refresh_token:
         res = requests.post(
             f"{NOTION_BASE}/oauth/token",
-            headers = {
+            headers={
                 "Content-Type": "application/json",
-                "Authorization": _basic_auth_header(),      #  ← NEW
-            }
-
-
+                "Authorization": _basic_auth_header(),
+            },
             json={
                 "grant_type":    "refresh_token",
                 "refresh_token": auth.refresh_token,
-                "client_id":     os.getenv("NOTION_CLIENT_ID"),
-                "client_secret": os.getenv("NOTION_CLIENT_SECRET"),
             },
             timeout=30,
         ).json()
@@ -293,9 +299,8 @@ def store_notion_pages(request):
     return JsonResponse({"stored": len(pages), "ingested": ing})
 
 
-
 # =============================================================================
-#   3. COMMON RAG / CHAT
+# 3. COMMON RAG / CHAT (unchanged)
 # =============================================================================
 def _embed_query(q: str):
     return client.embeddings.create(model=EMBED_MODEL, input=q).data[0].embedding
@@ -348,7 +353,6 @@ def _pull_notion_text(file_id: str, token: str) -> str:
 
 
 def _export_text(user, file_id):
-    # try Drive first
     dt = _valid_drive_token(user)
     if dt:
         try:
@@ -410,8 +414,9 @@ def chat_completion(request):
 
     return JsonResponse({"response": reply})
 
+
 # =============================================================================
-#   4. CSRF / SPA ENTRY
+# 4. CSRF / SPA ENTRY
 # =============================================================================
 @ensure_csrf_cookie
 def index_with_csrf(request):
