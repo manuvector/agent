@@ -8,7 +8,9 @@ SECURE_PROXY_SSL_HEADER   = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Canonical redirect URIs – must EXACTLY match what you entered in the
 # Google Cloud and Notion dashboards.
 DRIVE_REDIRECT_URI  = "https://manuvector.net/connect/drive/callback/"
-NOTION_REDIRECT_URI = "https://manuvector.net/connect/notion/callback/"
+NOTION_REDIRECT_URI = "https://manuvector.net/api/notion/callback/"
+NOTION_CONNECT_REDIRECT_URI = "https://manuvector.net/connect/notion/callback/"
+
 
 CSRF_TRUSTED_ORIGINS = ["https://manuvector.net", "http://localhost:8000"]
 CSRF_COOKIE_NAME = "csrftoken"
