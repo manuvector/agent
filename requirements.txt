@@ -12,4 +12,6 @@ google-auth
 google-auth-httplib2
 google-auth-oauthlib
 pdfminer.six==20221105
-python-mcp-client
+gunicorn>=22.0
+whitenoise>=6.6        # if you still let Django serve /static/*
+
