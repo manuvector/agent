@@ -9,7 +9,7 @@ jobs:
 
     services:
       postgres:
-        image: ankane/pgvector:pg15   
+        image: ankane/pgvector:latest 
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: user
