@@ -14,4 +14,7 @@ google-auth-oauthlib==1.2.2
 pdfminer.six==20221105
 pytest==8.4.1
 responses>=0.24
+freezegun
+pytest-django
+pytest-mock
 
