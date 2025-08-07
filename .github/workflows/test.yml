@@ -41,7 +41,6 @@ jobs:
 
       - name: Run migrations
         run: python manage.py migrate
-
+      
       - name: Run tests
-        run: pytest --tb=short --disable-warnings
-
+        run: PYTHONPATH=$PWD pytest --tb=short --disable-warnings
