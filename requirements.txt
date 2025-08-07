@@ -17,5 +17,5 @@ responses>=0.24
 freezegun
 pytest-django
 pytest-mock
-pytest-responses==0.7.0
+responses[pytest]>=0.25
 
