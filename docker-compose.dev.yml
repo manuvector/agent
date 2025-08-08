@@ -1,0 +1,12 @@
+services:
+  web:
+    volumes:
+      - .:/code
+    environment:
+      DJANGO_DEBUG: "1"
+    # Optional: override command to ensure autoreload during dev.
+    # Comment this out if your Dockerfile already runs runserver.
+    # command: python manage.py runserver 0.0.0.0:8000
+
+  # (db inherits from base; no change needed)
+
