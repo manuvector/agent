@@ -91,8 +91,8 @@ def _valid_token(user):
         auth.save()
     return auth.access_token
 
-
-@login_required
+from agent.auth import login_required_json
+@login_required_json
 @require_GET
 def drive_token(request):
     token = _valid_token(request.user)
@@ -101,7 +101,7 @@ def drive_token(request):
     return JsonResponse({"token": token})
 
 
-@login_required
+@login_required_json
 @require_POST
 def store_selected_files(request):
     """

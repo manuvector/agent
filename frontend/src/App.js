@@ -59,7 +59,7 @@ export default function App() {
     }
 
     if (res.redirected) {
-      window.location.href = res.url;
+      window.location.href = "/accounts/login/?next=/";
       return;
     }
     if (res.status === 400) {
