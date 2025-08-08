@@ -39,3 +39,23 @@ def test_ingest_drive_file_minimal(user, mocker):
     chunk = qs.first()
     assert chunk.char_end == len("hello world")
 
+import json
+from unittest.mock import patch
+
+@pytest.mark.django_db
+def test_store_selected_files_ingests(client, django_user_model):
+    from agent.models import DriveAuth
+    user = django_user_model.objects.create_user("u","u@x.com","p")
+    client.force_login(user)
+    DriveAuth.objects.create(user=user, access_token="tok", expiry_ts=time.time()+3600)
+
+    with patch("agent.views.ingest_drive_file") as ingest_mock:
+        payload = {"files":[{"id":"file1","name":"Doc 1"}]}
+        res = client.post(
+            reverse("store_selected_files"),
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+    assert res.status_code == 200
+    ingest_mock.assert_called_once_with(user, "file1", "tok")
+

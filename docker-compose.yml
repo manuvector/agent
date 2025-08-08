@@ -35,8 +35,9 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     ports:
       - "8000:8000"
-    volumes:
-      - .:/code
+    # In prod, rely on your Dockerfile's CMD.
+    # If you want Gunicorn, uncomment (and make sure it's installed):
+    # command: gunicorn agent.wsgi:application --bind 0.0.0.0:8000
 
 volumes:
   pgdata:

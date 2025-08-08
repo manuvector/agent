@@ -69,7 +69,7 @@ export default function App() {
 
     const ctype = res.headers.get("content-type") || "";
     if (!ctype.includes("application/json")) {
-      window.location.href = "/accounts/login/?next=/chat";
+      window.location.href = "/accounts/login/?next=/";
       return;
     }
 
