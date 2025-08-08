@@ -9,8 +9,17 @@ def test_ragchunk_uniqueness(user):
         user=user, file_id="foo", file_name="doc", chunk_idx=0,
         char_start=0, char_end=10, embedding=[0.1]*1536
     )
+    payload = {
+    "user": c1.user,
+    "file_id": c1.file_id,
+    "file_name": c1.file_name,
+    "chunk_idx": c1.chunk_idx,
+    "char_start": c1.char_start,
+    "char_end": c1.char_end,
+    "embedding": c1.embedding,
+    }
     with pytest.raises(IntegrityError):
-        RagChunk.objects.create(**c1.__dict__, id=None)  # duplicate key
+        RagChunk.objects.create(**payload)
 
 def test_driveauth_expired_property(user):
     auth = DriveAuth.objects.create(

@@ -28,20 +28,30 @@ COPY ./agent ./agent
 COPY ./rag   ./rag
 
 # -------- Node / React build -------------------------------------------------
-# (Done after Python deps to leverage Docker cache)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get update && apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+ARG SKIP_FRONTEND=false
+ENV SKIP_FRONTEND=$SKIP_FRONTEND
+
+RUN if [ "$SKIP_FRONTEND" != "true" ]; then \
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+      apt-get update && apt-get install -y nodejs && \
+      rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY ./frontend ./frontend
 WORKDIR /code/frontend
-RUN npm install --no-audit --no-fund --loglevel=error && npm run build
+
+RUN if [ "$SKIP_FRONTEND" != "true" ]; then \
+      npm install --no-audit --no-fund --loglevel=error && \
+      npm run build; \
+    fi
 
 # -------- copy built assets into Django -------------------------------------
 WORKDIR /code
-RUN mkdir -p agent/templates/frontend agent/static && \
-    cp frontend/build/index.html agent/templates/index.html && \
-    cp -r frontend/build/static/*  agent/static/
+RUN if [ "$SKIP_FRONTEND" != "true" ]; then \
+      mkdir -p agent/templates/frontend agent/static && \
+      cp frontend/build/index.html agent/templates/index.html && \
+      cp -r frontend/build/static/*  agent/static/; \
+    fi
 
 # -------- collectstatic ------------------------------------------------------
 RUN python manage.py collectstatic --noinput
